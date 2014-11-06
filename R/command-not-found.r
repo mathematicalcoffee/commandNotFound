@@ -12,10 +12,10 @@
 # TODO: unloadNamespace when done (if not already loaded)
 # TODO: save somewhere, and fetch from our private package namespace.
 updateDB = function (in.place=T, quiet=T, progress=F, db.varname='.functionDB') {
-    db = NULL    
+    db = NULL
     if (!exists(db.varname, envir=.GlobalEnv, mode='list')) {
         .functionDBNew = buildDB(quiet=quiet, progress=progress)
-    } else { 
+    } else {
         db = get(db.varname, envir=.GlobalEnv)
         if ('command-not-found' %in% class(db)) {
           ps = .packages(all.available=T)
@@ -33,20 +33,20 @@ updateDB = function (in.place=T, quiet=T, progress=F, db.varname='.functionDB') 
         assign(db.varname, .functionDBNew, envir=.GlobalEnv)
         return(invisible(.functionDBNew))
     }
-    return(.functionDBNew)      
+    return(.functionDBNew)
 }
 
 buildDB = function (progress=T, quiet=F, packages = .packages(all.available=T)) {
   osch = search()
   if (quiet) progress=F
-  
+
   pb = NULL
   if (!quiet) message("building function list...")
   if (progress) pb = txtProgressBar(min=0, max=length(ps), initial=0,
                                     style=3)
   if (progress) {
   fs = lapply(seq_along(packages),
-              function (i) {                
+              function (i) {
                 l = ps[i]
                 fns = getFunctionsFromNamespace(l)
                 # TODO: dropNamespace after we get it?
@@ -57,7 +57,7 @@ buildDB = function (progress=T, quiet=F, packages = .packages(all.available=T)) 
   close(pb)
   } else {
     fs = getFunctionsFromNamespace(packages)
-  } 
+  }
   invisible(fs)
 }
 
@@ -71,20 +71,20 @@ getFunctionsFromNamespace = function (packages) {
     if (length(r)) names(which(r))
     else character()
   })
-  
+
   data.frame(fun=unlist(objs, use.names=F),
              package=rep(packages, vapply(objs, length, -1)),
-             stringsAsFactors=F)  
+             stringsAsFactors=F)
 }
 
-recommend = function (typofunction, loaded.functions=.functionDB, notfound.message=T) {    
+recommend = function (typofunction, loaded.functions=.functionDB, notfound.message=T) {
   dists = adist(typofunction,
                 loaded.functions$fun,
                 fixed=T,
                 partial=F,
                 count=T,
                 ignore.case=T)
-    
+
   matches = which(dists <= 2)
   if (length(matches) > 0) {
     counts = attr(dists, 'counts')[1,matches,]
@@ -96,7 +96,7 @@ recommend = function (typofunction, loaded.functions=.functionDB, notfound.messa
     # want AT MOST 1 of each type of error (but up to 2 total. TODO: 3?)
     matches = matches[rowSums(counts > 1) == 0]
     counts = counts[rowSums(counts > 1) == 0, ,drop=F]
-    
+
     # Smallest distance first.
     # Then tiebreak by substitutiones
     matches = matches[order(dists[matches],
@@ -123,11 +123,11 @@ recommend = function (typofunction, loaded.functions=.functionDB, notfound.messa
 }
 
 #' this one requires the {namespace to be attached, library to be on the searchpath} (not sure which).
-getFunctions.deprecated = function (packages) {  
+getFunctions.deprecated = function (packages) {
   need.prefix = grep('package:', packages, fixed=T, inv=T)
   packages[need.prefix]=paste0('package:', packages[need.prefix])
   # NOTE: they have to be loaded for this.
-  
+
   objs = do.call('rbind',
                  lapply(packages, function (ns) {
                    fun = names(Filter(is.function, mget(ls(ns), inherits=T)))
@@ -141,11 +141,12 @@ getFunctions.deprecated = function (packages) {
   objs
 }
 
+# TODO: save package version in DB so can update appropriately
 # want to catch /any/ error, not just tryCatch. Could we restart the session inside a
 #  tryCatch?
 # TODO: Get last error (so we can override options(error=) to only handle particular errors)
 # no arguments.
-# best bet is geterrmessage() ? 
+# best bet is geterrmessage() ?
 # Error ... : could not find function ".."
 # Error ... : object '..' not found
 # object '..' of mode '..' was not found (?) --> get(x, mode=mode)
@@ -157,7 +158,7 @@ error.fun = function () {
           recommend(fn, notfound.message=F)
           return(invisible(NULL))
         }
-    }    
+    }
     # It seems to output the error message anyway? So I don't have
     # to worry about going to the default handler?
     # TODO: save whatever the handler is on load, restore on unload, override options(error=X)
@@ -170,9 +171,9 @@ options(error=error.fun)
 # 1. onLoad, go through /all/ packages and update (regardless of if attached or not) + hook install.package OR
 # 2. onLoad, go through all /loaded/ packages and update with them, THEN add hooks on all the
 #     remaining ones for if/when they are loaded
-.onAttach = function () {
+#.onAttach = function () {
   # go through all already-attached??
-}
+#}
 
 # TODO: cache all available packages by calling installed.packages() once and then taking advantage
 #  of that cache.
@@ -200,7 +201,7 @@ addLoadHooks = function () {
 #       Also, takes some time to build this cache: ?Rscript > The default for Rscript omits methods as it takes about 60% of the startup time.
 #       ** tools:::makeLazyLoadDB?
 # - [x] Note, installed.packages makes a cache, we could check out its code? It only caches for the CURRENT SESSION (uses tempdir() and rebuilds each time). saveRDS there.
-# 
+#
 # in library() source
 # > ## Check for the methods package before attaching this
 # > ## package.
@@ -219,7 +220,7 @@ addLoadHooks = function () {
 #
 # getHook/packageEvent
 # The sequence of events depends on which hooks are defined, and whether a package is attached or just loaded. In the case where all hooks are defined and a package is attached, the order of initialization events is as follows:
-#  
+#
 # 1.  The package namespace is loaded.
 # 2. The package's .onLoad function is run.
 # 3. The namespace is sealed.
@@ -233,7 +234,7 @@ addLoadHooks = function () {
 # ls(.userHooksEnv)
 # FOR US:
 #
-# * OUR package onAttach: build/update the DB 
+# * OUR package onAttach: build/update the DB
 # * OUR package onLoad (or wait til onAttach i.e. library(...)?): add hooks to...
 # * ANY OTHER package loaded but not attached: update the DB from it.
 #
