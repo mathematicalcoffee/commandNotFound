@@ -4,64 +4,14 @@
 # searchpaths(), search(): list of packages on the search path (only put there once you library() it, I want more)
 # installed.packages()
 
-# objs <- mget(ls("package:base"), inherits = TRUE)
-# funs <- Filter(is.function, objs)
+# TODO DOCUMENTATION
 
-# getAnywhere
-
-# TODO: unloadNamespace when done (if not already loaded)
-# TODO: save somewhere, and fetch from our private package namespace.
-updateDB = function (in.place=T, quiet=T, progress=F, db.varname='.functionDB') {
-    db = NULL
-    if (!exists(db.varname, envir=.GlobalEnv, mode='list')) {
-        .functionDBNew = buildDB(quiet=quiet, progress=progress)
-    } else {
-        db = get(db.varname, envir=.GlobalEnv)
-        if ('command-not-found' %in% class(db)) {
-          ps = .packages(all.available=T)
-          ps = ps[!(ps %in% unique(db$package))]
-          if (length(ps))
-            .functionDBNew = rbind(db, buildDB(quiet=quiet, progress=progress, packages=ps))
-          else
-            .functionDBNew = db
-        } else {
-          .functionDBNew = buildDB(quiet=quiet, progress=progress)
-        }
-    }
-    class(.functionDBNew) = c('command-not-found', class(.functionDBNew))
-    if (in.place) {
-        assign(db.varname, .functionDBNew, envir=.GlobalEnv)
-        return(invisible(.functionDBNew))
-    }
-    return(.functionDBNew)
-}
-
-buildDB = function (progress=T, quiet=F, packages = .packages(all.available=T)) {
-  osch = search()
-  if (quiet) progress=F
-
-  pb = NULL
-  if (!quiet) message("building function list...")
-  if (progress) pb = txtProgressBar(min=0, max=length(ps), initial=0,
-                                    style=3)
-  if (progress) {
-  fs = lapply(seq_along(packages),
-              function (i) {
-                l = ps[i]
-                fns = getFunctionsFromNamespace(l)
-                # TODO: dropNamespace after we get it?
-                if (progress) setTxtProgressBar(pb, i)
-                fns
-              })
-  fs = do.call('rbind', fs)
-  close(pb)
-  } else {
-    fs = getFunctionsFromNamespace(packages)
-  }
-  invisible(fs)
-}
-
-getFunctionsFromNamespace = function (packages) {
+#' Retrieves a list of functions from the given package(s)
+#'
+#' @param packages {character vector} a character vector of packages to get functions from
+#' @return {data.frame} a data frame
+#' @examples
+getFunctionsFromPackage = function (packages) {
   packages = sub('^package:', '', packages)
   objs = lapply(packages, function (n) {
     ns = getNamespace(n)
@@ -120,25 +70,6 @@ recommend = function (typofunction, loaded.functions=.functionDB, notfound.messa
   }
   message(msg)
   invisible(loaded.functions[matches,])
-}
-
-#' this one requires the {namespace to be attached, library to be on the searchpath} (not sure which).
-getFunctions.deprecated = function (packages) {
-  need.prefix = grep('package:', packages, fixed=T, inv=T)
-  packages[need.prefix]=paste0('package:', packages[need.prefix])
-  # NOTE: they have to be loaded for this.
-
-  objs = do.call('rbind',
-                 lapply(packages, function (ns) {
-                   fun = names(Filter(is.function, mget(ls(ns), inherits=T)))
-                   if (length(fun))
-                     data.frame(fun=names(Filter(is.function, mget(ls(ns), inherits=T, envir=ns))),
-                                package=sub('package:', '', ns, fixed=T),
-                                stringsAsFactors=F)
-                   else
-                     NULL
-                 }))
-  objs
 }
 
 # TODO: save package version in DB so can update appropriately
